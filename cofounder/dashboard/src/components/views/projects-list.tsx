@@ -16,10 +16,9 @@ import {
 	Dialog,
 	DialogContent,
 	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-	DialogTrigger,
+        DialogHeader,
+        DialogTitle,
+        DialogTrigger,
 } from "@/components/ui/dialog";
 import {
 	Form,
@@ -35,9 +34,13 @@ import { Textarea } from "@/components/ui/textarea";
 
 const ProjectsList = () => {
 	const SERVER_LOCAL_URL = "http://localhost:4200/api";
-	const [projects, setProjects] = useState([]);
-	const [slugifiedId, setSlugifiedId] = useState("");
-	const navigate = useNavigate();
+        const [projects, setProjects] = useState([]);
+        const [slugifiedId, setSlugifiedId] = useState("");
+        const [estimation, setEstimation] = useState<any | null>(null);
+        const [estimationError, setEstimationError] = useState<string | null>(null);
+        const [isEstimating, setIsEstimating] = useState(false);
+        const [isCreating, setIsCreating] = useState(false);
+        const navigate = useNavigate();
 
 	const [isRecording, setIsRecording] = useState(false);
 	const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -66,32 +69,80 @@ const ProjectsList = () => {
 		fetchProjects();
 	}, []);
 
-	const slugify = (text: string) => {
-		return text
-			.toString()
-			.toLowerCase()
-			.replace(/\s+/g, "-")
-			.replace(/[^\w\-]+/g, "")
-			.replace(/\-\-+/g, "-")
-			.replace(/^-+/, "")
-			.replace(/-+$/, "");
-	};
+        const slugify = (text: string) => {
+                return text
+                        .toString()
+                        .toLowerCase()
+                        .replace(/\s+/g, "-")
+                        .replace(/[^\w\-]+/g, "")
+                        .replace(/\-\-+/g, "-")
+                        .replace(/^-+/, "")
+                        .replace(/-+$/, "");
+        };
 
-	const onSubmit = async (data: any) => {
-		try {
-			const response = await fetch(`${SERVER_LOCAL_URL}/projects/new`, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(data),
-			});
-			const responseData = await response.json();
-			navigate(`/project/${responseData.project}`);
-		} catch (error) {
-			console.error("Failed to create new project:", error);
-		}
-	};
+        const watchedProject = form.watch("project");
+        const watchedDescription = form.watch("description");
+        const watchedAesthetics = form.watch("aesthetics");
+
+        useEffect(() => {
+                setEstimation(null);
+                setEstimationError(null);
+        }, [watchedProject, watchedDescription, watchedAesthetics]);
+
+        const estimateTokens = async () => {
+                const values = form.getValues();
+                if (!values.description?.trim()?.length) {
+                        setEstimationError("Description is required before estimating tokens.");
+                        return;
+                }
+                setIsEstimating(true);
+                setEstimationError(null);
+                try {
+                        const response = await fetch(`${SERVER_LOCAL_URL}/projects/estimate`, {
+                                method: "POST",
+                                headers: {
+                                        "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify(values),
+                        });
+                        if (!response.ok) {
+                                throw new Error("Failed to fetch estimate");
+                        }
+                        const data = await response.json();
+                        setEstimation({ ...data.estimate, fingerprint: JSON.stringify(values) });
+                } catch (error) {
+                        console.error("Failed to estimate token usage:", error);
+                        setEstimationError("Could not estimate token usage. Please try again.");
+                        setEstimation(null);
+                } finally {
+                        setIsEstimating(false);
+                }
+        };
+
+        const onSubmit = async (data: any) => {
+                const fingerprint = JSON.stringify(data);
+                if (!estimation || estimation.fingerprint !== fingerprint) {
+                        await estimateTokens();
+                        return;
+                }
+
+                try {
+                        setIsCreating(true);
+                        const response = await fetch(`${SERVER_LOCAL_URL}/projects/new`, {
+                                method: "POST",
+                                headers: {
+                                        "Content-Type": "application/json",
+                                },
+                                body: JSON.stringify(data),
+                        });
+                        const responseData = await response.json();
+                        navigate(`/project/${responseData.project}`);
+                } catch (error) {
+                        console.error("Failed to create new project:", error);
+                } finally {
+                        setIsCreating(false);
+                }
+        };
 
 	const api_resumeProject = async ({ project }) => {
 		try {
@@ -305,11 +356,65 @@ const ProjectsList = () => {
 										</FormItem>
 									)}
 								/>
-								<DialogFooter className="mt-4 dark">
-									<Button type="submit" variant="outline" className="font-normal">
-										Create Project
-									</Button>
-								</DialogFooter>
+                                                                <div className="flex flex-col gap-3 mt-6">
+                                                                        <div className="flex items-center justify-between gap-2">
+                                                                                <Button
+                                                                                        type="button"
+                                                                                        variant="secondary"
+                                                                                        className="font-normal"
+                                                                                        onClick={estimateTokens}
+                                                                                        disabled={isEstimating}
+                                                                                >
+                                                                                        {(isEstimating && "Estimating…") || "Estimate token usage"}
+                                                                                </Button>
+                                                                                <Button
+                                                                                        type="submit"
+                                                                                        variant="outline"
+                                                                                        className="font-normal"
+                                                                                        disabled={
+                                                                                                isCreating ||
+                                                                                                isEstimating ||
+                                                                                                !estimation ||
+                                                                                                estimation.fingerprint !== JSON.stringify(form.getValues())
+                                                                                        }
+                                                                                >
+                                                                                        {(isCreating && "Creating…") || "Create Project"}
+                                                                                </Button>
+                                                                        </div>
+                                                                        {(estimation || estimationError) && (
+                                                                                <div className="border border-[#333] rounded-md p-3 bg-[#1a1a1a] text-sm space-y-2">
+                                                                                        {estimation && (
+                                                                                                <>
+                                                                                                        <div className="flex justify-between items-center">
+                                                                                                                <span className="text-[#aaa]">Estimated tokens needed</span>
+                                                                                                                <span className="text-lg font-semibold text-white">
+                                                                                                                        {(estimation.total_tokens ?? 0).toLocaleString()}
+                                                                                                                </span>
+                                                                                                        </div>
+                                                                                                        <p className="text-[#888] leading-relaxed">
+                                                                                                                {estimation.reasoning || "Estimate pending rationale."}
+                                                                                                        </p>
+                                                                                                        {estimation.breakdown?.length > 0 && (
+                                                                                                                <div className="space-y-1">
+                                                                                                                        <p className="text-[#888]">Breakdown</p>
+                                                                                                                        <ul className="list-disc list-inside text-[#ccc]">
+                                                                                                                                {estimation.breakdown.map((item: any, index: number) => (
+                                                                                                                                        <li key={`${item.stage}-${index}`}>
+                                                                                                                                                {item.stage}: {item.tokens?.toLocaleString?.() || item.tokens} tokens
+                                                                                                                                        </li>
+                                                                                                                                ))}
+                                                                                                                        </ul>
+                                                                                                                </div>
+                                                                                                        )}
+                                                                                                        <p className="text-[#777] text-xs">
+                                                                                                                {`Estimate source: ${estimation.method || "heuristic"}. Re-run after editing the form to refresh.`}
+                                                                                                        </p>
+                                                                                                </>
+                                                                                        )}
+                                                                                        {estimationError && <p className="text-red-400">{estimationError}</p>}
+                                                                                </div>
+                                                                        )}
+                                                                </div>
 							</form>
 						</Form>
 					</DialogContent>

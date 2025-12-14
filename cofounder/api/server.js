@@ -14,6 +14,8 @@ import open, { openApp, apps } from "open";
 import cofounder from "./build.js";
 dotenv.config();
 
+const silentStream = { write: () => {}, cutoff: null };
+
 // -------------------------------------------------------------- HELPERS  ------------------------
 function _slugify(text) {
 	return text
@@ -173,8 +175,8 @@ app.get("/api/projects/list", (req, res) => {
 });
 
 app.post("/api/utils/transcribe", async (req, res) => {
-	const uid = Math.random().toString(36).slice(2, 11); // Generate a random unique ID
-	const tempFilePath = path.join(__dirname, "db/storage/temp", `${uid}.webm`);
+        const uid = Math.random().toString(36).slice(2, 11); // Generate a random unique ID
+        const tempFilePath = path.join(__dirname, "db/storage/temp", `${uid}.webm`);
 
 	// Ensure the directory exists
 	fs.mkdirSync(path.dirname(tempFilePath), { recursive: true });
@@ -200,7 +202,71 @@ app.post("/api/utils/transcribe", async (req, res) => {
 		fs.unlink(tempFilePath, (err) => {
 			if (err) console.error("Error deleting temporary file:", err);
 		});
-	}
+        }
+});
+
+app.post("/api/projects/estimate", async (req, res) => {
+        const request = req.body;
+        if (!request.description?.trim().length) {
+                return res.status(400).json({ error: "> no project description provided" });
+        }
+
+        const description = request.description.trim();
+        const aesthetics = request.aesthetics?.trim?.() ? request.aesthetics.trim() : "";
+        const project = request.project?.trim?.() || "unnamed-project";
+
+        const heuristicTokens = Math.max(
+                1500,
+                Math.ceil((description.length + aesthetics.length + project.length) / 4) * 3,
+        );
+
+        let aiEstimate = null;
+        try {
+                const { text } = await utils.openai.inference({
+                        model: process.env.TOKEN_ESTIMATOR_MODEL || `gpt-4o-mini`,
+                        messages: [
+                                {
+                                        role: "system",
+                                        content:
+                                                "You estimate token usage for an automated full-stack app generator. Respond with a compact JSON object only.",
+                                },
+                                {
+                                        role: "user",
+                                        content: `Project name: ${project}\nDescription: ${description}\nAesthetics: ${aesthetics}\nProvide {\"total_tokens\": number, \"breakdown\": [{\"stage\": string, \"tokens\": number}], \"reasoning\": string, \"confidence\": string}. Keep totals conservative to avoid overruns.`,
+                                },
+                        ],
+                        stream: silentStream,
+                });
+
+                const jsonMatch = text.match(/\{[\s\S]*\}/);
+                const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(text);
+                aiEstimate = {
+                        total_tokens: parsed.total_tokens,
+                        breakdown: parsed.breakdown,
+                        reasoning: parsed.reasoning,
+                        confidence: parsed.confidence,
+                };
+        } catch (error) {
+                console.error("token estimation failed", error);
+        }
+
+        const total_tokens = Math.round(
+                aiEstimate?.total_tokens && Number.isFinite(aiEstimate.total_tokens)
+                        ? aiEstimate.total_tokens
+                        : heuristicTokens,
+        );
+
+        const estimate = {
+                total_tokens,
+                breakdown: Array.isArray(aiEstimate?.breakdown) ? aiEstimate.breakdown : [],
+                reasoning:
+                        aiEstimate?.reasoning ||
+                        "Heuristic estimate based on description length and typical generation steps.",
+                confidence: aiEstimate?.confidence || "low",
+                method: aiEstimate ? "ai" : "heuristic",
+        };
+
+        res.status(200).json({ estimate });
 });
 
 app.post("/api/projects/new", async (req, res) => {
