@@ -6,14 +6,16 @@ import firebase from "@/utils/firebase.js";
 import storage from "@/utils/storage.js";
 import load from "@/utils/load.js";
 import anthropic from "@/utils/anthropic.js";
+import providers from "@/utils/providers.js";
 
 export default {
-	parsers,
-	openai,
-	anthropic,
-	vectra,
-	render,
-	firebase,
+        parsers,
+        openai,
+        anthropic,
+        providers,
+        vectra,
+        render,
+        firebase,
 	storage,
 	load,
 };

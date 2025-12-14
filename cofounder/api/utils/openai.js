@@ -3,13 +3,17 @@ import OpenAI from "openai";
 import dotenv from "dotenv";
 dotenv.config();
 
+const openaiApiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+const openaiBaseUrl = process.env.OPENAI_BASE_URL || process.env.AI_API_BASE_URL;
+
 let openai;
 try {
-	openai = new OpenAI({
-		apiKey: process.env.OPENAI_API_KEY,
-	});
+        openai = new OpenAI({
+                apiKey: openaiApiKey,
+                baseURL: openaiBaseUrl?.length ? openaiBaseUrl : undefined,
+        });
 } catch (e) {
-	console.error("utils:openai : " + e);
+        console.error("utils:openai : " + e);
 }
 
 async function inference({

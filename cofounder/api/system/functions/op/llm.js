@@ -57,11 +57,8 @@ async function opLlmGen({ context, data }) {
 		parser = utils.parsers.parse.yaml;
 	}
 
-	const llm_fn = !process.env.LLM_PROVIDER
-		? utils.openai.inference
-		: process.env.LLM_PROVIDER.toLowerCase() === "openai"
-			? utils.openai.inference
-			: utils.anthropic.inference;
+        const llmProvider = utils.providers.resolveLLMProvider();
+        const llm_fn = llmProvider.inference || utils.openai.inference;
 
 	const { text, usage } = await llm_fn({
 		model: model,
@@ -106,15 +103,17 @@ function chunkify(array, chunkSize) {
 }
 
 async function opLlmVectorizeChunk({ context, data }) {
-	/* ;; op:LLM::VECTORIZE:CHUNK
-		{texts} -> {vectors,usage}
-		chunk processor (batches of 20)
-		queue concurrency/lims defined for this one
-	*/
-	const { texts } = data;
-	return await utils.openai.vectorize({
-		texts,
-	});
+        /* ;; op:LLM::VECTORIZE:CHUNK
+                {texts} -> {vectors,usage}
+                chunk processor (batches of 20)
+                queue concurrency/lims defined for this one
+        */
+        const { texts } = data;
+        const llmProvider = utils.providers.resolveLLMProvider();
+        const vectorize = llmProvider.vectorize || utils.openai.vectorize;
+        return await vectorize({
+                texts,
+        });
 }
 async function opLlmVectorize({ context, data }) {
 	/* ;; op:LLM::VECTORIZE
