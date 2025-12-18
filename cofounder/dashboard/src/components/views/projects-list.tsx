@@ -31,16 +31,18 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Badge } from "@/components/ui/badge";
 
 const ProjectsList = () => {
 	const SERVER_LOCAL_URL = "http://localhost:4200/api";
-        const [projects, setProjects] = useState([]);
-        const [slugifiedId, setSlugifiedId] = useState("");
-        const [estimation, setEstimation] = useState<any | null>(null);
-        const [estimationError, setEstimationError] = useState<string | null>(null);
-        const [isEstimating, setIsEstimating] = useState(false);
-        const [isCreating, setIsCreating] = useState(false);
-        const navigate = useNavigate();
+	const [projects, setProjects] = useState([]);
+	const [saasProviders, setSaasProviders] = useState<any[]>([]);
+	const [slugifiedId, setSlugifiedId] = useState("");
+	const [estimation, setEstimation] = useState<any | null>(null);
+	const [estimationError, setEstimationError] = useState<string | null>(null);
+	const [isEstimating, setIsEstimating] = useState(false);
+	const [isCreating, setIsCreating] = useState(false);
+	const navigate = useNavigate();
 
 	const [isRecording, setIsRecording] = useState(false);
 	const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
@@ -58,9 +60,12 @@ const ProjectsList = () => {
 	useEffect(() => {
 		const fetchProjects = async () => {
 			try {
-				const response = await fetch(`${SERVER_LOCAL_URL}/projects/list`);
+				const response = await fetch(
+					`${SERVER_LOCAL_URL}/projects/list?blocks=projects,saas`,
+				);
 				const data = await response.json();
-				setProjects(data.projects);
+				setProjects(data.projects || []);
+				setSaasProviders(data?.saas?.providers || []);
 			} catch (error) {
 				console.error("Failed to fetch projects:", error);
 			}
@@ -244,20 +249,19 @@ const ProjectsList = () => {
 		}
 	};
 
-	return (
-		<>
-			<div className="flex justify-between items-center mb-6 dark">
-				<h1 className="text-xl">Projects</h1>
-				<Dialog>
-					<DialogTrigger asChild>
-						<Button variant="secondary" className="font-normal">
-							+&nbsp;New Project
-						</Button>
-					</DialogTrigger>
-					<DialogContent
-						className="font-light text-white bg-[#222] backdrop-blur-md
-                        border-[#222] min-w-[50vw] min-h-[65vh] max-h-[90vh] overflow-auto p-8"
-					>
+		return (
+			<>
+				<div className="flex justify-between items-center mb-6 dark">
+					<h1 className="text-xl">Projects</h1>
+					<Dialog>
+						<DialogTrigger asChild>
+							<Button variant="secondary" className="font-normal">
+								+&nbsp;New Project
+							</Button>
+						</DialogTrigger>
+						<DialogContent
+							className="font-light text-white bg-[#222] backdrop-blur-md border-[#222] min-w-[50vw] min-h-[65vh] max-h-[90vh] overflow-auto p-8"
+						>
 						<DialogHeader>
 							<DialogTitle className="font-normal text-xl">New Project</DialogTitle>
 							<DialogDescription className="text-base text-[#ccc]">
@@ -419,8 +423,57 @@ const ProjectsList = () => {
 						</Form>
 					</DialogContent>
 				</Dialog>
-			</div>
-			<div className="mt-4 pt-4 border-t border-[#222] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+				</div>
+				{saasProviders.length > 0 && (
+					<Card className="bg-[#1a1a1a] border-[#333] text-white mb-6">
+						<CardHeader>
+							<CardTitle className="text-lg">Available SaaS providers</CardTitle>
+						</CardHeader>
+						<CardContent className="grid gap-3 md:grid-cols-2">
+							{saasProviders.map((provider) => (
+								<div
+									key={provider.name}
+									className="rounded-lg border border-[#333] p-4 flex flex-col gap-2 bg-[#111]"
+								>
+									<div className="flex items-center gap-2">
+										<Badge variant="secondary" className="uppercase">
+											{provider.name}
+										</Badge>
+										<span className="text-base font-semibold">
+											{provider.displayName || provider.name}
+										</span>
+									</div>
+									{provider.notes && (
+										<p className="text-sm text-neutral-300">{provider.notes}</p>
+									)}
+									<div className="flex gap-3 text-sm">
+										{provider.projectUrl && (
+											<a
+												href={provider.projectUrl}
+												target="_blank"
+												rel="noreferrer"
+												className="text-teal-300 hover:text-teal-200 underline"
+											>
+												Website
+											</a>
+										)}
+										{provider.docsUrl && (
+											<a
+												href={provider.docsUrl}
+												target="_blank"
+												rel="noreferrer"
+												className="text-teal-300 hover:text-teal-200 underline"
+											>
+												Docs
+											</a>
+										)}
+									</div>
+								</div>
+							))}
+						</CardContent>
+					</Card>
+				)}
+				<div className="mt-4 pt-4 border-t border-[#222] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 				{projects.map((project: any) => (
 					<Link key={project.id} to={`/project/${project.id}`}>
 						<motion.div

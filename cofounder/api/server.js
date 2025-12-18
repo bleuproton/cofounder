@@ -12,6 +12,7 @@ import { hideBin } from "yargs/helpers";
 import { merge } from "lodash-es";
 import open, { openApp, apps } from "open";
 import cofounder from "./build.js";
+import { readJsonIfExists, runBlocks } from "./utils/blocks.js";
 dotenv.config();
 
 const silentStream = { write: () => {}, cutoff: null };
@@ -142,24 +143,19 @@ const server = app.listen(PORT, () => {
 	open(`http://localhost:${PORT}/`);
 });
 
-// -------------------------------------------------------- SERVER REST API PATHS ------------------------
-
-app.get("/api/ping", (req, res) => {
-	res.status(200).json({ message: "pong" });
-});
-
-app.get("/api/projects/list", (req, res) => {
-	fs.readdir("./db/projects", (err, files) => {
-		if (err) {
-			return res.status(500).json({ error: "> cant read projects directory" });
+// -------------------------------------------------------- BLOCK HELPERS ------------------------
+const BLOCKS_REGISTRY = {
+	projects: async ({ context }) => {
+		const projectsRoot = path.join(context.root, "db/projects");
+		if (!fs.existsSync(projectsRoot)) {
+			return { projects: [] };
 		}
-		const projects = files
-			.filter((file) =>
-				fs.statSync(path.join("./db/projects", file)).isDirectory(),
-			)
+		const projects = fs
+			.readdirSync(projectsRoot)
+			.filter((file) => fs.statSync(path.join(projectsRoot, file)).isDirectory())
 			.map((projectDir) => {
 				const yamlFilePath = path.join(
-					"./db/projects",
+					projectsRoot,
 					projectDir,
 					"state/pm/user/details.yaml",
 				);
@@ -170,8 +166,72 @@ app.get("/api/projects/list", (req, res) => {
 				}
 				return { id: projectDir, data: false };
 			});
-		res.status(200).json({ projects });
-	});
+
+		return { projects };
+	},
+	saas: async ({ context }) => {
+		const configPath = path.join(context.root, "db/config/saas.json");
+		const samplePath = path.join(context.root, "db/config/saas.example.json");
+		const config =
+			readJsonIfExists(configPath) ||
+			readJsonIfExists(samplePath) || { providers: [] };
+		const providers = Array.isArray(config.providers)
+			? config.providers.map(
+					({ name, displayName, projectUrl, docsUrl, notes }) => ({
+						name,
+						displayName: displayName || name,
+						projectUrl: projectUrl || "",
+						docsUrl: docsUrl || "",
+						notes: notes || "",
+					}),
+				)
+			: [];
+
+		return {
+			saas: { providers },
+		};
+	},
+};
+
+function parseRequestedBlocks(blocksValue) {
+	if (Array.isArray(blocksValue)) return blocksValue.filter(Boolean);
+	if (typeof blocksValue === "string" && blocksValue.trim().length) {
+		return blocksValue
+			.split(",")
+			.map((entry) => entry.trim())
+			.filter(Boolean);
+	}
+	return ["projects"];
+}
+// ----------------------------------------------------------------------------------------------------
+
+// -------------------------------------------------------- SERVER REST API PATHS ------------------------
+
+app.get("/api/ping", (req, res) => {
+	res.status(200).json({ message: "pong" });
+});
+
+app.get("/api/projects/list", async (req, res) => {
+	try {
+		const blocks = parseRequestedBlocks(req.query.blocks);
+		const { result, errors } = await runBlocks({
+			blocks,
+			registry: BLOCKS_REGISTRY,
+			context: { root: __dirname },
+		});
+
+		res.status(200).json({
+			...result,
+			meta: {
+				blocks,
+				errors,
+				availableBlocks: Object.keys(BLOCKS_REGISTRY),
+			},
+		});
+	} catch (error) {
+		console.error(error);
+		res.status(500).json({ error: "> cant read projects directory" });
+	}
 });
 
 app.post("/api/utils/transcribe", async (req, res) => {
