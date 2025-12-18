@@ -1,0 +1,21 @@
+version: "3.9"
+services:
+  theia:
+    build: .
+    container_name: cofounder-theia
+    environment:
+      - THEIA_WEBVIEW_EXTERNAL_ENDPOINT={{hostname}}
+      - THEIA_DEFAULT_PLUGINS=local-dir:/home/project/.theia/plugins
+      - NODE_OPTIONS=--max-old-space-size=4096
+    user: "1000:1000"
+    ports:
+      - "3000:3000"
+      - "5173:5173"
+      - "5174:5174"
+    volumes:
+      - ../..:/home/project
+      - theia-cache:/home/theia/.cache
+    working_dir: /home/project
+    command: ["node", "/home/theia/src-gen/backend/main.js", "/home/project", "--hostname", "0.0.0.0", "--port", "3000"]
+volumes:
+  theia-cache:

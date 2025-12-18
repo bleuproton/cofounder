@@ -176,6 +176,31 @@ The default LLM concurrency is set to `2` so you can see what's happening in you
 
 ---
 
+# Theia IDE integration (optional)
+
+Use the bundled Theia setup to edit generated apps in-browser with the required Node 22 runtime.
+
+1. Build and start Theia (exposes port `3000`):
+   ```sh
+   cd ops/theia
+   docker compose up --build
+   ```
+2. Generate Theia tasks for each app under `./apps/{YourApp}`:
+   ```sh
+   node scripts/generate-theia-tasks.js
+   ```
+3. Open http://localhost:3000, choose the `apps/{YourApp}` folder, and run the tasks:
+   - `npm install ({YourApp})`
+   - `npm run dev ({YourApp})`
+4. Vite is available on http://localhost:5173 (and 5174 if Vite selects an alternate port); both are forwarded through the compose file alongside Theia.
+
+Notes:
+- The Theia image installs Node 22 via `nvm` so terminals match the project runtime.
+- The repository is mounted read/write into the container, so edits appear immediately on the host.
+- Re-run the task generator after creating a new app to scaffold fresh tasks/settings.
+
+---
+
 # Changelog
 
 ---
