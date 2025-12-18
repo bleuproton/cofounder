@@ -1,0 +1,18 @@
+{
+	"providers": [
+		{
+			"name": "supabase",
+			"displayName": "Supabase (Postgres + Auth)",
+			"projectUrl": "https://supabase.com/",
+			"docsUrl": "https://supabase.com/docs",
+			"notes": "Set SUPABASE_URL and SUPABASE_ANON_KEY in your environment when generating apps."
+		},
+		{
+			"name": "clerk",
+			"displayName": "Clerk (Auth)",
+			"projectUrl": "https://clerk.com/",
+			"docsUrl": "https://clerk.com/docs",
+			"notes": "Provide a publishable key and JWT templates; keep secrets outside version control."
+		}
+	]
+}
