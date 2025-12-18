@@ -225,6 +225,7 @@ app.get("/api/projects/list", async (req, res) => {
 			meta: {
 				blocks,
 				errors,
+				availableBlocks: Object.keys(BLOCKS_REGISTRY),
 			},
 		});
 	} catch (error) {
